@@ -1,16 +1,56 @@
-import { getCurrentUser } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { getCurrentUser, User } from '@/lib/auth'
 import DashboardNav from '@/components/DashboardNav'
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const user = await getCurrentUser()
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const currentUser = await getCurrentUser()
+
+        if (!currentUser) {
+          console.log('No user in layout, redirecting to login')
+          router.push('/login')
+          return
+        }
+
+        console.log('✅ User authenticated in layout:', currentUser.email)
+        setUser(currentUser)
+      } catch (error) {
+        console.error('❌ Layout auth check failed:', error)
+        router.push('/login')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) {
-    redirect('/login')
+    return null
   }
 
   return (

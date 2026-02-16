@@ -1,10 +1,11 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { PrismaService } from './common/services/prisma.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, UsersModule],
   providers: [PrismaService],
 })
 export class AppModule implements NestModule {

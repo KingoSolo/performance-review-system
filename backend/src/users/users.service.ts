@@ -1,0 +1,344 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../common/services/prisma.service';
+import { UserRole } from '@prisma/client';
+
+export interface CreateUserDto {
+  email: string;
+  name: string;
+  role: UserRole;
+  managerId?: string;
+}
+
+export interface UpdateUserDto {
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  managerId?: string;
+}
+
+export interface ImportUserDto {
+  email: string;
+  name: string;
+  role: string;
+  managerEmail?: string;
+}
+
+@Injectable()
+export class UsersService {
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * CRITICAL: Find all users - MUST filter by companyId
+   */
+  async findAll(companyId: string) {
+    return this.prisma.user.findMany({
+      where: { companyId },
+      include: {
+        manager: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        directReports: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  /**
+   * CRITICAL: Find user by ID - MUST filter by companyId
+   */
+  async findOne(userId: string, companyId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        companyId,
+      },
+      include: {
+        manager: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        directReports: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        teamMemberships: {
+          include: {
+            team: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  /**
+   * Create new user - automatically assigns companyId
+   */
+  async create(companyId: string, createUserDto: CreateUserDto) {
+    const { email, name, role, managerId } = createUserDto;
+
+    // Check if email already exists in company
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        email,
+        companyId,
+      },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('User with this email already exists in your company');
+    }
+
+    // If manager is specified, verify they exist in same company
+    if (managerId) {
+      const manager = await this.prisma.user.findFirst({
+        where: {
+          id: managerId,
+          companyId,
+        },
+      });
+
+      if (!manager) {
+        throw new BadRequestException('Manager not found in your company');
+      }
+    }
+
+    return this.prisma.user.create({
+      data: {
+        email,
+        name,
+        role,
+        companyId,
+        managerId,
+        password: '', // Password managed by Supabase
+      },
+      include: {
+        manager: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Update user - MUST verify companyId
+   */
+  async update(userId: string, companyId: string, updateUserDto: UpdateUserDto) {
+    // Verify user exists in company
+    await this.findOne(userId, companyId);
+
+    // If updating manager, verify manager exists in company
+    if (updateUserDto.managerId) {
+      const manager = await this.prisma.user.findFirst({
+        where: {
+          id: updateUserDto.managerId,
+          companyId,
+        },
+      });
+
+      if (!manager) {
+        throw new BadRequestException('Manager not found in your company');
+      }
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: updateUserDto,
+      include: {
+        manager: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Soft delete user (we don't actually delete, just mark as inactive)
+   * For now, we'll actually delete, but in production you'd add an 'active' field
+   */
+  async remove(userId: string, companyId: string) {
+    // Verify user exists in company
+    await this.findOne(userId, companyId);
+
+    // Check if user has direct reports
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        directReports: true,
+      },
+    });
+
+    if (user?.directReports && user.directReports.length > 0) {
+      throw new BadRequestException(
+        'Cannot delete user with direct reports. Reassign them first.',
+      );
+    }
+
+    return this.prisma.user.delete({
+      where: { id: userId },
+    });
+  }
+
+  /**
+   * Get all managers in company (for dropdown)
+   */
+  async getManagers(companyId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        companyId,
+        role: {
+          in: ['MANAGER', 'ADMIN'],
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  }
+
+  /**
+   * Import users from Excel data
+   * CRITICAL: All imports are scoped to companyId
+   */
+  async importUsers(companyId: string, users: ImportUserDto[]) {
+    const results = {
+      successful: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    // First pass: create all users without managers
+    const createdUsers = new Map<string, string>(); // email -> id
+
+    for (const userData of users) {
+      try {
+        // Validate role
+        if (!['ADMIN', 'MANAGER', 'EMPLOYEE'].includes(userData.role.toUpperCase())) {
+          results.failed++;
+          results.errors.push(`Invalid role for ${userData.email}: ${userData.role}`);
+          continue;
+        }
+
+        // Check if user already exists
+        const existing = await this.prisma.user.findFirst({
+          where: {
+            email: userData.email,
+            companyId,
+          },
+        });
+
+        if (existing) {
+          results.failed++;
+          results.errors.push(`User already exists: ${userData.email}`);
+          continue;
+        }
+
+        // Create user without manager first
+        const user = await this.prisma.user.create({
+          data: {
+            email: userData.email,
+            name: userData.name,
+            role: userData.role.toUpperCase() as UserRole,
+            companyId,
+            password: '', // Managed by Supabase
+          },
+        });
+
+        createdUsers.set(userData.email, user.id);
+        results.successful++;
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push(`Error creating ${userData.email}: ${error.message}`);
+      }
+    }
+
+    // Second pass: assign managers
+    for (const userData of users) {
+      if (userData.managerEmail && createdUsers.has(userData.email)) {
+        try {
+          // Find manager by email in same company
+          const manager = await this.prisma.user.findFirst({
+            where: {
+              email: userData.managerEmail,
+              companyId,
+            },
+          });
+
+          if (manager) {
+            const userId = createdUsers.get(userData.email);
+            await this.prisma.user.update({
+              where: { id: userId },
+              data: { managerId: manager.id },
+            });
+          }
+        } catch (error: any) {
+          // Manager assignment failed, but user was created
+          results.errors.push(
+            `Could not assign manager for ${userData.email}: ${error.message}`,
+          );
+        }
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Get user statistics
+   */
+  async getStats(companyId: string) {
+    const [total, admins, managers, employees] = await Promise.all([
+      this.prisma.user.count({ where: { companyId } }),
+      this.prisma.user.count({ where: { companyId, role: 'ADMIN' } }),
+      this.prisma.user.count({ where: { companyId, role: 'MANAGER' } }),
+      this.prisma.user.count({ where: { companyId, role: 'EMPLOYEE' } }),
+    ]);
+
+    return {
+      total,
+      byRole: {
+        admins,
+        managers,
+        employees,
+      },
+    };
+  }
+}

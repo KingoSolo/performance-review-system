@@ -1,16 +1,58 @@
-import { getCurrentUser } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+'use client'
 
-export default async function AdminDashboard() {
-  const user = await getCurrentUser()
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { getCurrentUser, User } from '@/lib/auth'
 
-  if (!user) {
-    redirect('/login')
+export default function AdminDashboard() {
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const currentUser = await getCurrentUser()
+
+        if (!currentUser) {
+          console.log('No user found, redirecting to login')
+          router.push('/login')
+          return
+        }
+
+        // Ensure only admins can access
+        if (currentUser.role !== 'ADMIN') {
+          console.log('User is not admin, redirecting')
+          router.push('/employee')
+          return
+        }
+
+        console.log('✅ Admin user authenticated:', currentUser.email)
+        setUser(currentUser)
+      } catch (error) {
+        console.error('❌ Auth check failed:', error)
+        router.push('/login')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
-  // Ensure only admins can access
-  if (user.role !== 'ADMIN') {
-    redirect('/employee')
+  if (!user) {
+    return null
   }
 
   return (
