@@ -43,6 +43,12 @@ enum ReviewerType {
   PEER
 }
 
+enum QuestionType {
+  RATING
+  TEXT
+  TASK_LIST
+}
+
 // ============================================================================
 // MODELS
 // ============================================================================
@@ -162,13 +168,15 @@ model ReviewConfig {
 }
 
 model Question {
-  id         String     @id @default(cuid())
-  companyId  String     @map("company_id")
-  reviewType ReviewType @map("review_type")
+  id         String       @id @default(cuid())
+  companyId  String       @map("company_id")
+  reviewType ReviewType   @map("review_type")
+  type       QuestionType @default(RATING)
   text       String
-  maxChars   Int?       @map("max_chars")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
+  maxChars   Int?         @map("max_chars")
+  order      Int          @default(0)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
 
   // Relations
   company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -176,6 +184,7 @@ model Question {
 
   @@index([companyId])
   @@index([companyId, reviewType])
+  @@index([companyId, reviewType, order])
   @@map("questions")
 }
 

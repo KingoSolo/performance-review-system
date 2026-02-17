@@ -44,7 +44,7 @@ export interface UserStats {
   }
 }
 
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
+export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const session = await getSession()
   if (!session) {
     throw new Error('Not authenticated')
