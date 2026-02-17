@@ -2,11 +2,12 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { QuestionsModule } from './questions/questions.module';
+import { ReviewCyclesModule } from './review-cycles/review-cycles.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { PrismaService } from './common/services/prisma.service';
 
 @Module({
-  imports: [AuthModule, UsersModule, QuestionsModule],
+  imports: [AuthModule, UsersModule, QuestionsModule, ReviewCyclesModule],
   providers: [PrismaService],
 })
 export class AppModule implements NestModule {
