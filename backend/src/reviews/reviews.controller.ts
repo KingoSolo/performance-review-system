@@ -165,4 +165,76 @@ export class ReviewsController {
       body.submit || false,
     );
   }
+
+  // ============================================================================
+  // Peer Review Endpoints
+  // ============================================================================
+
+  /**
+   * GET /reviews/peer/:cycleId
+   * Get list of employees assigned to this peer for review
+   * Returns employees with their review status
+   */
+  @Get('peer/:cycleId')
+  async getEmployeesToReviewAsPeer(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: any,
+    @CompanyId() companyId: string,
+  ) {
+    return this.reviewsService.getEmployeesToReviewAsPeer(
+      user.id,
+      companyId,
+      cycleId,
+    );
+  }
+
+  /**
+   * GET /reviews/peer/:cycleId/:employeeId
+   * Get peer review form for specific employee
+   * Does NOT include employee's self-review
+   */
+  @Get('peer/:cycleId/:employeeId')
+  async getPeerReview(
+    @Param('cycleId') cycleId: string,
+    @Param('employeeId') employeeId: string,
+    @CurrentUser() user: any,
+    @CompanyId() companyId: string,
+  ) {
+    return this.reviewsService.findOrCreatePeerReview(
+      user.id,
+      companyId,
+      cycleId,
+      employeeId,
+    );
+  }
+
+  /**
+   * POST /reviews/peer/:cycleId/:employeeId
+   * Save or submit peer review
+   * Body should include { answers: [...], submit: boolean }
+   */
+  @Post('peer/:cycleId/:employeeId')
+  async savePeerReview(
+    @Param('cycleId') cycleId: string,
+    @Param('employeeId') employeeId: string,
+    @Body() body: SaveDraftDto & { submit?: boolean },
+    @CurrentUser() user: any,
+    @CompanyId() companyId: string,
+  ) {
+    // First get the review to obtain reviewId
+    const { review } = await this.reviewsService.findOrCreatePeerReview(
+      user.id,
+      companyId,
+      cycleId,
+      employeeId,
+    );
+
+    return this.reviewsService.savePeerReview(
+      review.id,
+      user.id,
+      companyId,
+      { answers: body.answers },
+      body.submit || false,
+    );
+  }
 }

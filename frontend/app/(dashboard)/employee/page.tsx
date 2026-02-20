@@ -214,16 +214,36 @@ export default function EmployeeDashboard() {
                         {new Date(cycle.endDate).toLocaleDateString()}
                       </p>
                     </div>
-                    <button
-                      onClick={() =>
-                        router.push(
-                          `/employee/reviews/self?cycleId=${cycle.id}`,
-                        )
-                      }
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Start Self Review
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/employee/reviews/self?cycleId=${cycle.id}`,
+                          )
+                        }
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        My Self Review
+                      </button>
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/employee/reviews/peer?cycleId=${cycle.id}`,
+                          )
+                        }
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Peer Reviews
+                      </button>
+                      <button
+                        onClick={() =>
+                          router.push(`/employee/scores?cycleId=${cycle.id}`)
+                        }
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        📊 View Scores
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

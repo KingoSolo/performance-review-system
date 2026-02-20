@@ -15,6 +15,12 @@ export default function NewReviewCyclePage() {
   return (
     <div className="px-4 py-6 sm:px-0">
       <div className="mb-6">
+        <button
+          onClick={() => router.push('/admin/review-cycles')}
+          className="text-sm text-indigo-600 hover:text-indigo-800 mb-2"
+        >
+          ← Back to Review Cycles
+        </button>
         <h1 className="text-2xl font-bold text-gray-900">
           Create Review Cycle
         </h1>

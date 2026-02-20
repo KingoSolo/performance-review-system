@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { reviewCyclesApi, ReviewCycle } from '@/lib/review-cycles';
-import { getEmployeesToReview, EmployeeToReview } from '@/lib/reviews';
+import { getEmployeesToReviewAsPeer, EmployeeToReview } from '@/lib/reviews';
 
-export default function ManagerReviewsPage() {
+export default function PeerReviewsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const cycleParam = searchParams.get('cycleId');
@@ -52,7 +52,7 @@ export default function ManagerReviewsPage() {
     try {
       setLoadingEmployees(true);
       setError('');
-      const employeeList = await getEmployeesToReview(cycleId);
+      const employeeList = await getEmployeesToReviewAsPeer(cycleId);
       setEmployees(employeeList);
     } catch (err: any) {
       setError(err.message || 'Failed to load employees');
@@ -64,8 +64,7 @@ export default function ManagerReviewsPage() {
 
   const handleCycleChange = (cycleId: string) => {
     setSelectedCycleId(cycleId);
-    // Update URL with cycle param
-    router.push(`/manager/reviews?cycleId=${cycleId}`);
+    router.push(`/employee/reviews/peer?cycleId=${cycleId}`);
   };
 
   const getStatusBadge = (status: string) => {
@@ -117,14 +116,14 @@ export default function ManagerReviewsPage() {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => router.push('/manager')}
-          className="text-sm text-indigo-600 hover:text-indigo-800 mb-2"
+          onClick={() => router.push('/employee')}
+          className="text-sm text-purple-600 hover:text-purple-800 mb-2"
         >
           ← Back to Dashboard
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">Manager Reviews</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Peer Reviews</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Review your assigned employees for the selected cycle
+          Review your assigned peers for the selected cycle
         </p>
       </div>
 
@@ -194,9 +193,9 @@ export default function ManagerReviewsPage() {
                 % complete
               </p>
             </div>
-            <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center">
+            <div className="h-16 w-16 rounded-full bg-purple-100 flex items-center justify-center">
               <svg
-                className="h-8 w-8 text-indigo-600"
+                className="h-8 w-8 text-purple-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -205,7 +204,7 @@ export default function ManagerReviewsPage() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
                 />
               </svg>
             </div>
@@ -242,11 +241,10 @@ export default function ManagerReviewsPage() {
                 />
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">
-                No employees assigned
+                No peers assigned
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                You haven't been assigned any employees to review for this
-                cycle.
+                You haven't been assigned any peers to review for this cycle.
               </p>
             </div>
           ) : (
@@ -256,8 +254,8 @@ export default function ManagerReviewsPage() {
                   <div className="px-4 py-4 flex items-center sm:px-6 hover:bg-gray-50">
                     <div className="min-w-0 flex-1 flex items-center">
                       <div className="flex-shrink-0">
-                        <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center">
-                          <span className="text-lg font-medium text-indigo-600">
+                        <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                          <span className="text-lg font-medium text-purple-600">
                             {employee.name
                               .split(' ')
                               .map((n) => n[0])
@@ -268,7 +266,7 @@ export default function ManagerReviewsPage() {
                       </div>
                       <div className="min-w-0 flex-1 px-4">
                         <div>
-                          <p className="text-sm font-medium text-indigo-600 truncate">
+                          <p className="text-sm font-medium text-purple-600 truncate">
                             {employee.name}
                           </p>
                           <p className="mt-1 text-sm text-gray-500 truncate">
@@ -284,10 +282,10 @@ export default function ManagerReviewsPage() {
                       <button
                         onClick={() =>
                           router.push(
-                            `/manager/reviews/${employee.id}?cycleId=${selectedCycleId}`,
+                            `/employee/reviews/peer/${employee.id}?cycleId=${selectedCycleId}`,
                           )
                         }
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                       >
                         {employee.reviewStatus === 'SUBMITTED'
                           ? 'View Review'

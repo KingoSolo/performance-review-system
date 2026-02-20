@@ -142,3 +142,60 @@ export async function saveManagerReview(
     body: JSON.stringify({ answers, submit }),
   });
 }
+
+// ============================================================================
+// Peer Review API Functions
+// ============================================================================
+
+export interface PeerReviewData {
+  review: {
+    id: string;
+    reviewCycleId: string;
+    employeeId: string;
+    reviewerId: string;
+    reviewType: string;
+    status: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
+    updatedAt: string;
+  };
+  questions: QuestionWithAnswer[];
+  employee: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+/**
+ * Get list of employees assigned to current peer for review
+ */
+export async function getEmployeesToReviewAsPeer(
+  cycleId: string,
+): Promise<EmployeeToReview[]> {
+  return fetchWithAuth(`${API_URL}/reviews/peer/${cycleId}`);
+}
+
+/**
+ * Get peer review form for specific employee
+ * Does NOT include employee's self-review
+ */
+export async function getPeerReview(
+  cycleId: string,
+  employeeId: string,
+): Promise<PeerReviewData> {
+  return fetchWithAuth(`${API_URL}/reviews/peer/${cycleId}/${employeeId}`);
+}
+
+/**
+ * Save or submit peer review
+ */
+export async function savePeerReview(
+  cycleId: string,
+  employeeId: string,
+  answers: Answer[],
+  submit: boolean = false,
+): Promise<{ message: string; updatedAt?: string }> {
+  return fetchWithAuth(`${API_URL}/reviews/peer/${cycleId}/${employeeId}`, {
+    method: 'POST',
+    body: JSON.stringify({ answers, submit }),
+  });
+}

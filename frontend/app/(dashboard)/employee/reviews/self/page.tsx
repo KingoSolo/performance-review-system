@@ -231,6 +231,12 @@ export default function SelfReviewPage() {
     <div className="px-4 py-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
+        <button
+          onClick={() => router.push('/employee')}
+          className="text-sm text-indigo-600 hover:text-indigo-800 mb-2"
+        >
+          ← Back to Dashboard
+        </button>
         <h1 className="text-2xl font-bold text-gray-900">Self Review</h1>
         <p className="mt-1 text-sm text-gray-600">
           Complete your self-assessment for this review cycle

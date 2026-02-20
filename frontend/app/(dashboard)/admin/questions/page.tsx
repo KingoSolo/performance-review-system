@@ -159,6 +159,12 @@ export default function QuestionsPage() {
     <div className="px-4 py-6 sm:px-0">
       {/* Header */}
       <div className="mb-6">
+        <button
+          onClick={() => window.location.href = '/admin'}
+          className="text-sm text-indigo-600 hover:text-indigo-800 mb-2"
+        >
+          ← Back to Admin Dashboard
+        </button>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Question Builder</h1>

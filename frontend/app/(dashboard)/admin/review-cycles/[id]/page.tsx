@@ -126,12 +126,26 @@ export default function EditReviewCyclePage({
                 Only DRAFT cycles can be edited. This cycle is currently{' '}
                 {cycle.status}.
               </p>
-              <div className="mt-4">
+              <div className="mt-4 flex gap-4">
                 <button
                   onClick={() => router.push('/admin/review-cycles')}
                   className="text-sm font-medium text-yellow-800 hover:text-yellow-900"
                 >
                   ← Back to Review Cycles
+                </button>
+                <button
+                  onClick={() => router.push(`/admin/cycles/${params.id}/scores`)}
+                  className="text-sm font-medium text-yellow-800 hover:text-yellow-900"
+                >
+                  📊 View Scores
+                </button>
+                <button
+                  onClick={() =>
+                    router.push(`/admin/review-cycles/${params.id}/assign-reviewers`)
+                  }
+                  className="text-sm font-medium text-yellow-800 hover:text-yellow-900"
+                >
+                  👥 Assign Reviewers
                 </button>
               </div>
             </div>
