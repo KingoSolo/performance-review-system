@@ -22,17 +22,27 @@ export default function EmployeeDashboard() {
     try {
       const currentUser = await getCurrentUser();
       if (!currentUser) {
-        router.push('/login');
+        console.log('No user found');
+        setLoading(false);
         return;
       }
 
+      console.log('User loaded:', currentUser.email, currentUser.role);
       setUser(currentUser);
 
       // Fetch active review cycles
-      const cycles = await reviewCyclesApi.getAll('ACTIVE');
-      setActiveCycles(cycles);
-    } catch (err) {
+      console.log('Fetching active review cycles...');
+      try {
+        const cycles = await reviewCyclesApi.getAll('ACTIVE');
+        console.log('Cycles loaded:', cycles.length);
+        setActiveCycles(cycles);
+      } catch (apiError: any) {
+        console.error('API error (non-fatal):', apiError.message);
+        // Continue anyway - just show empty cycles list
+      }
+    } catch (err: any) {
       console.error('Error loading dashboard:', err);
+      // Don't redirect on error, just show empty state
     } finally {
       setLoading(false);
     }
