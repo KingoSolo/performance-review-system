@@ -11,17 +11,27 @@ export interface User {
 
 export async function getSession() {
   console.log('📱 Getting session from Supabase...')
-  const { data: { session }, error } = await supabase.auth.getSession()
-  if (error) {
-    console.error('❌ Error getting session:', error)
+
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession()
+
+    if (error) {
+      console.error('❌ Error getting session:', error.message)
+      return null
+    }
+
+    if (session) {
+      console.log('✅ Session found:', session.user.email)
+      console.log('   Token expires at:', new Date(session.expires_at! * 1000).toLocaleString())
+    } else {
+      console.log('⚠️  No session found in storage')
+    }
+
+    return session
+  } catch (error) {
+    console.error('❌ Exception getting session:', error)
     return null
   }
-  if (session) {
-    console.log('✅ Session found:', session.user.email)
-  } else {
-    console.log('⚠️  No session found')
-  }
-  return session
 }
 
 export async function getCurrentUser(): Promise<User | null> {
@@ -84,8 +94,12 @@ export async function signIn(email: string, password: string) {
     })
     if (error) {
       console.error('❌ Error setting session:', error)
+      throw new Error('Failed to persist session')
     } else {
       console.log('✅ Session set successfully')
+      // Wait a moment to ensure session is persisted to storage
+      await new Promise(resolve => setTimeout(resolve, 100))
+      console.log('✅ Session persistence confirmed')
     }
   } else {
     console.warn('⚠️  No session in response')
@@ -122,8 +136,12 @@ export async function signUp(email: string, password: string, name: string, comp
     })
     if (error) {
       console.error('❌ Error setting session:', error)
+      throw new Error('Failed to persist session')
     } else {
       console.log('✅ Session set successfully')
+      // Wait a moment to ensure session is persisted to storage
+      await new Promise(resolve => setTimeout(resolve, 100))
+      console.log('✅ Session persistence confirmed')
     }
   } else {
     console.warn('⚠️  No session in response')

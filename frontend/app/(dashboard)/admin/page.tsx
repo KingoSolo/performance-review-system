@@ -3,14 +3,17 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, User } from '@/lib/auth'
+import { usersApi } from '@/lib/api'
+import { reviewCyclesApi } from '@/lib/review-cycles'
 
 export default function AdminDashboard() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({ totalEmployees: 0, activeCycles: 0 })
 
   useEffect(() => {
-    async function checkAuth() {
+    async function loadDashboard() {
       try {
         const currentUser = await getCurrentUser()
 
@@ -29,15 +32,34 @@ export default function AdminDashboard() {
 
         console.log('✅ Admin user authenticated:', currentUser.email)
         setUser(currentUser)
+
+        // Fetch dashboard stats
+        console.log('📊 Fetching dashboard stats...')
+        const [userStats, allCycles] = await Promise.all([
+          usersApi.getStats(),
+          reviewCyclesApi.getAll(),
+        ])
+
+        const activeCycles = allCycles.filter(c => c.status === 'ACTIVE')
+
+        setStats({
+          totalEmployees: userStats.total,
+          activeCycles: activeCycles.length,
+        })
+
+        console.log('✅ Dashboard stats loaded:', {
+          employees: userStats.total,
+          activeCycles: activeCycles.length,
+        })
       } catch (error) {
-        console.error('❌ Auth check failed:', error)
+        console.error('❌ Dashboard load failed:', error)
         router.push('/login')
       } finally {
         setLoading(false)
       }
     }
 
-    checkAuth()
+    loadDashboard()
   }, [router])
 
   if (loading) {
@@ -90,7 +112,9 @@ export default function AdminDashboard() {
                     <dt className="text-sm font-medium text-gray-500 truncate">
                       Total Employees
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">-</dd>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {stats.totalEmployees}
+                    </dd>
                   </dl>
                 </div>
               </div>
@@ -120,7 +144,9 @@ export default function AdminDashboard() {
                     <dt className="text-sm font-medium text-gray-500 truncate">
                       Active Review Cycles
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">-</dd>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {stats.activeCycles}
+                    </dd>
                   </dl>
                 </div>
               </div>
@@ -150,7 +176,7 @@ export default function AdminDashboard() {
                     <dt className="text-sm font-medium text-gray-500 truncate">
                       Completion Rate
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">-%</dd>
+                    <dd className="text-lg font-semibold text-gray-900">0%</dd>
                   </dl>
                 </div>
               </div>
@@ -161,18 +187,24 @@ export default function AdminDashboard() {
         {/* Admin Actions */}
         <div className="mt-8">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-              Create Review Cycle
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <button
+              onClick={() => router.push('/admin/review-cycles')}
+              className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Manage Review Cycles
             </button>
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            <button
+              onClick={() => router.push('/admin/employees')}
+              className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            >
               Manage Employees
             </button>
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            <button
+              onClick={() => router.push('/admin/questions')}
+              className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            >
               Configure Questions
-            </button>
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              View Analytics
             </button>
           </div>
         </div>

@@ -10,21 +10,29 @@ import {
 import ReviewCycleList from '@/components/review-cycles/ReviewCycleList';
 
 export default function ReviewCyclesPage() {
+  const [allCycles, setAllCycles] = useState<ReviewCycle[]>([]);
   const [cycles, setCycles] = useState<ReviewCycle[]>([]);
   const [selectedTab, setSelectedTab] = useState<ReviewCycleStatus>('DRAFT');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Load all cycles once on mount
   useEffect(() => {
-    loadCycles(selectedTab);
-  }, [selectedTab]);
+    loadCycles();
+  }, []);
 
-  const loadCycles = async (status: ReviewCycleStatus) => {
+  // Filter cycles locally when tab changes
+  useEffect(() => {
+    const filtered = allCycles.filter((c) => c.status === selectedTab);
+    setCycles(filtered);
+  }, [selectedTab, allCycles]);
+
+  const loadCycles = async () => {
     try {
       setLoading(true);
       setError('');
-      const data = await reviewCyclesApi.getAll(status);
-      setCycles(data);
+      const data = await reviewCyclesApi.getAll(); // Fetch all cycles without status filter
+      setAllCycles(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load review cycles');
     } finally {
@@ -81,7 +89,7 @@ export default function ReviewCyclesPage() {
                       : 'bg-gray-100'
                   }`}
                 >
-                  {cycles.length}
+                  {allCycles.filter((c) => c.status === tab.value).length}
                 </span>
               )}
             </button>
@@ -134,7 +142,7 @@ export default function ReviewCyclesPage() {
       <ReviewCycleList
         cycles={cycles}
         loading={loading}
-        onRefresh={() => loadCycles(selectedTab)}
+        onRefresh={loadCycles}
       />
     </div>
   );

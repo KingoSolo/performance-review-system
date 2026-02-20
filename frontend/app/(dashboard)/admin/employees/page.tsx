@@ -1,28 +1,97 @@
-import { getCurrentUser } from '@/lib/auth'
-import { redirect } from 'next/navigation'
-import { usersApi } from '@/lib/api'
-import EmployeeList from '@/components/employees/EmployeeList'
-import CreateEmployeeButton from '@/components/employees/CreateEmployeeButton'
+'use client';
 
-export default async function EmployeesPage() {
-  const user = await getCurrentUser()
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentUser, User } from '@/lib/auth';
+import { usersApi, UserStats } from '@/lib/api';
+import EmployeeList from '@/components/employees/EmployeeList';
+import CreateEmployeeButton from '@/components/employees/CreateEmployeeButton';
+import BackButton from '@/components/BackButton';
 
-  if (!user) {
-    redirect('/login')
+export default function EmployeesPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [stats, setStats] = useState<UserStats>({
+    total: 0,
+    byRole: { admins: 0, managers: 0, employees: 0 },
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        console.log('📋 Employees page: Loading data...');
+
+        // Check auth
+        const currentUser = await getCurrentUser();
+        if (!currentUser) {
+          console.log('⚠️  No user, redirecting to login');
+          router.push('/login');
+          return;
+        }
+
+        if (currentUser.role !== 'ADMIN') {
+          console.log('⚠️  Not admin, redirecting');
+          router.push('/employee');
+          return;
+        }
+
+        console.log('✅ User authenticated:', currentUser.email);
+        setUser(currentUser);
+
+        // Fetch data
+        console.log('📡 Fetching employees and stats...');
+        const [employeesData, statsData] = await Promise.all([
+          usersApi.getAll(),
+          usersApi.getStats(),
+        ]);
+
+        console.log('✅ Data loaded:', {
+          employees: employeesData.length,
+          stats: statsData.total,
+        });
+
+        setEmployees(employeesData);
+        setStats(statsData);
+      } catch (err: any) {
+        console.error('❌ Error loading employees page:', err);
+        setError(err.message || 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="px-4 py-6 sm:px-0">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading employees...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (user.role !== 'ADMIN') {
-    redirect('/employee')
+  if (error) {
+    return (
+      <div className="px-4 py-6 sm:px-0">
+        <div className="rounded-md bg-red-50 p-4">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      </div>
+    );
   }
-
-  // Fetch employees and stats
-  const [employees, stats] = await Promise.all([
-    usersApi.getAll(),
-    usersApi.getStats(),
-  ])
 
   return (
     <div className="px-4 py-6 sm:px-0">
+      <BackButton href="/admin" label="← Back to Dashboard" />
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Employee Management</h1>
@@ -157,5 +226,5 @@ export default async function EmployeesPage() {
       {/* Employee List */}
       <EmployeeList employees={employees} />
     </div>
-  )
+  );
 }

@@ -15,12 +15,17 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
+
     async function checkAuth() {
       try {
+        console.log('🔍 Dashboard layout: checking auth...')
         const currentUser = await getCurrentUser()
 
+        if (!mounted) return
+
         if (!currentUser) {
-          console.log('No user in layout, redirecting to login')
+          console.log('⚠️  No user in layout, redirecting to login')
           router.push('/login')
           return
         }
@@ -29,13 +34,21 @@ export default function DashboardLayout({
         setUser(currentUser)
       } catch (error) {
         console.error('❌ Layout auth check failed:', error)
-        router.push('/login')
+        if (mounted) {
+          router.push('/login')
+        }
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     checkAuth()
+
+    return () => {
+      mounted = false
+    }
   }, [router])
 
   if (loading) {
