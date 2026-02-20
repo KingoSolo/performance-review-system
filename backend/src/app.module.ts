@@ -4,6 +4,7 @@ import { UsersModule } from './users/users.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ReviewCyclesModule } from './review-cycles/review-cycles.module';
 import { ReviewerAssignmentsModule } from './reviewer-assignments/reviewer-assignments.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { PrismaService } from './common/services/prisma.service';
 
@@ -14,6 +15,7 @@ import { PrismaService } from './common/services/prisma.service';
     QuestionsModule,
     ReviewCyclesModule,
     ReviewerAssignmentsModule,
+    ReviewsModule,
   ],
   providers: [PrismaService],
 })
