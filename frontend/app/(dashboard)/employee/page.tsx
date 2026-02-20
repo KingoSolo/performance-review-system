@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getCurrentUser, User } from '@/lib/auth';
 import { reviewCyclesApi, ReviewCycle } from '@/lib/review-cycles';
+import { getEmployeeAnalytics, EmployeeAnalytics } from '@/lib/analytics';
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend } from 'recharts';
 
 export default function EmployeeDashboard() {
   const router = useRouter();
@@ -11,40 +13,56 @@ export default function EmployeeDashboard() {
   const successMessage = searchParams.get('message');
 
   const [user, setUser] = useState<User | null>(null);
-  const [activeCycles, setActiveCycles] = useState<ReviewCycle[]>([]);
+  const [cycles, setCycles] = useState<ReviewCycle[]>([]);
+  const [selectedCycleId, setSelectedCycleId] = useState<string>('');
+  const [analytics, setAnalytics] = useState<EmployeeAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (selectedCycleId) {
+      loadAnalytics();
+    }
+  }, [selectedCycleId]);
+
   const loadData = async () => {
     try {
       const currentUser = await getCurrentUser();
       if (!currentUser) {
-        console.log('No user found');
-        setLoading(false);
+        router.push('/login');
         return;
       }
 
-      console.log('User loaded:', currentUser.email, currentUser.role);
       setUser(currentUser);
 
-      // Fetch active review cycles
-      console.log('Fetching active review cycles...');
-      try {
-        const cycles = await reviewCyclesApi.getAll('ACTIVE');
-        console.log('Cycles loaded:', cycles.length);
-        setActiveCycles(cycles);
-      } catch (apiError: any) {
-        console.error('API error (non-fatal):', apiError.message);
-        // Continue anyway - just show empty cycles list
+      const allCycles = await reviewCyclesApi.getAll();
+      setCycles(allCycles);
+
+      // Select first active cycle or first cycle
+      const activeCycle = allCycles.find((c) => c.status === 'ACTIVE');
+      if (activeCycle) {
+        setSelectedCycleId(activeCycle.id);
+      } else if (allCycles.length > 0) {
+        setSelectedCycleId(allCycles[0].id);
       }
     } catch (err: any) {
       console.error('Error loading dashboard:', err);
-      // Don't redirect on error, just show empty state
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAnalytics = async () => {
+    if (!selectedCycleId) return;
+
+    try {
+      const data = await getEmployeeAnalytics(selectedCycleId);
+      setAnalytics(data);
+    } catch (err: any) {
+      console.error('Error loading analytics:', err);
     }
   };
 
@@ -60,6 +78,23 @@ export default function EmployeeDashboard() {
   }
 
   if (!user) return null;
+
+  const radarData = analytics
+    ? [
+        {
+          category: 'Self Review',
+          score: analytics.scoreBreakdown.self || 0,
+        },
+        {
+          category: 'Manager Review',
+          score: analytics.scoreBreakdown.manager || 0,
+        },
+        {
+          category: 'Peer Reviews',
+          score: analytics.scoreBreakdown.peer || 0,
+        },
+      ]
+    : [];
 
   return (
     <div className="px-4 py-6 sm:px-0">
@@ -85,16 +120,37 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      <div className="border-4 border-dashed border-gray-200 rounded-lg p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Employee Dashboard
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Welcome back, {user.name}! Track your performance and reviews.
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Employee Dashboard</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Welcome back, {user.name}! Track your performance and complete pending reviews.
         </p>
+      </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Quick Stats */}
+      {/* Cycle Selector */}
+      {cycles.length > 0 && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Review Cycle
+          </label>
+          <select
+            value={selectedCycleId}
+            onChange={(e) => setSelectedCycleId(e.target.value)}
+            className="block w-full md:w-96 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            {cycles.map((cycle) => (
+              <option key={cycle.id} value={cycle.id}>
+                {cycle.name} ({cycle.status})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Key Metrics */}
+      {analytics && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-6">
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
@@ -116,9 +172,45 @@ export default function EmployeeDashboard() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">
-                      Overall Score
+                      Your Score
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">-/5</dd>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {analytics.personalScore !== null
+                        ? analytics.personalScore.toFixed(2)
+                        : 'N/A'}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-6 w-6 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0h2a2 2 0 002-2v-6a2 2 0 012-2h2a2 2 0 012 2v6a2 2 0 01-2 2h-2"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Company Average
+                    </dt>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {analytics.companyAverage?.toFixed(2) || 'N/A'}
+                    </dd>
                   </dl>
                 </div>
               </div>
@@ -146,9 +238,15 @@ export default function EmployeeDashboard() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">
-                      Pending Reviews
+                      Self Review
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">-</dd>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {analytics.pendingTasks.selfReview ? (
+                        <span className="text-orange-600">Pending</span>
+                      ) : (
+                        <span className="text-green-600">Complete</span>
+                      )}
+                    </dd>
                   </dl>
                 </div>
               </div>
@@ -169,100 +267,212 @@ export default function EmployeeDashboard() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
                     />
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">
-                      Current Cycle
+                      Pending Peer Reviews
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">-</dd>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {analytics.pendingTasks.peerReviews}
+                    </dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Active Review Cycles */}
-        <div className="mt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Active Review Cycles
-          </h3>
-          {activeCycles.length === 0 ? (
-            <div className="bg-white shadow sm:rounded-lg p-6 text-center">
-              <p className="text-gray-500">
-                No active review cycles at the moment.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {activeCycles.map((cycle) => (
-                <div
-                  key={cycle.id}
-                  className="bg-white shadow sm:rounded-lg p-6"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-lg font-medium text-gray-900">
-                        {cycle.name}
-                      </h4>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {new Date(cycle.startDate).toLocaleDateString()} -{' '}
-                        {new Date(cycle.endDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/employee/reviews/self?cycleId=${cycle.id}`,
-                          )
-                        }
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        My Self Review
-                      </button>
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/employee/reviews/peer?cycleId=${cycle.id}`,
-                          )
-                        }
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        Peer Reviews
-                      </button>
-                      <button
-                        onClick={() =>
-                          router.push(`/employee/scores?cycleId=${cycle.id}`)
-                        }
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        📊 View Scores
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Review History */}
-        <div className="mt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Review History</h3>
-          <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            <ul className="divide-y divide-gray-200">
-              <li className="px-6 py-4 text-center text-gray-500">
-                No reviews to display. Your review history will appear here once cycles are completed.
-              </li>
-            </ul>
+      {/* Score Breakdown and Review Counts */}
+      {analytics && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Score Breakdown Radar Chart */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Score Breakdown
+            </h3>
+            {analytics.personalScore !== null ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <RadarChart data={radarData}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="category" />
+                  <PolarRadiusAxis domain={[0, 5]} />
+                  <Radar
+                    name="Your Scores"
+                    dataKey="score"
+                    stroke="#4f46e5"
+                    fill="#4f46e5"
+                    fillOpacity={0.6}
+                  />
+                  <Legend />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-gray-500 text-center">
+                  No score data available yet.
+                  <br />
+                  Complete your reviews to see your breakdown.
+                </p>
+              </div>
+            )}
           </div>
+
+          {/* Review Status */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Review Status
+            </h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                <span className="text-sm font-medium text-gray-600">Self Review</span>
+                <span className="text-sm">
+                  {analytics.reviewCounts.self > 0 ? (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                      Completed
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-800">
+                      {analytics.pendingTasks.selfReview ? 'Pending' : 'Not Started'}
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                <span className="text-sm font-medium text-gray-600">Manager Reviews</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {analytics.reviewCounts.manager} received
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                <span className="text-sm font-medium text-gray-600">Peer Reviews Received</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {analytics.reviewCounts.peer} received
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-3">
+                <span className="text-sm font-medium text-gray-600">Peer Reviews to Complete</span>
+                <span className="text-sm">
+                  {analytics.pendingTasks.peerReviews > 0 ? (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-800">
+                      {analytics.pendingTasks.peerReviews} pending
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                      All complete
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Score Comparison */}
+      {analytics && analytics.personalScore !== null && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Performance Comparison
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-600">Your Score</span>
+                <span className="text-sm font-semibold text-indigo-600">
+                  {analytics.personalScore.toFixed(2)} / 5.00
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="bg-indigo-600 h-3 rounded-full"
+                  style={{ width: `${(analytics.personalScore / 5) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {analytics.companyAverage && (
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-gray-600">Company Average</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {analytics.companyAverage.toFixed(2)} / 5.00
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className="bg-gray-500 h-3 rounded-full"
+                    style={{ width: `${(analytics.companyAverage / 5) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            {analytics.companyAverage && (
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Difference from Average</span>
+                  <span
+                    className={`text-lg font-semibold ${
+                      analytics.personalScore >= analytics.companyAverage
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {analytics.personalScore >= analytics.companyAverage ? '+' : ''}
+                    {(analytics.personalScore - analytics.companyAverage).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {analytics?.pendingTasks?.selfReview && (
+            <button
+              onClick={() =>
+                selectedCycleId &&
+                router.push(`/employee/reviews/self?cycleId=${selectedCycleId}`)
+              }
+              className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Complete Self Review
+            </button>
+          )}
+          {analytics?.pendingTasks?.peerReviews && analytics.pendingTasks.peerReviews > 0 && (
+            <button
+              onClick={() =>
+                selectedCycleId &&
+                router.push(`/employee/reviews/peer?cycleId=${selectedCycleId}`)
+              }
+              className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Complete Peer Reviews ({analytics.pendingTasks.peerReviews})
+            </button>
+          )}
+          <button
+            onClick={() =>
+              selectedCycleId &&
+              router.push(`/employee/scores?cycleId=${selectedCycleId}`)
+            }
+            className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            View Detailed Scores
+          </button>
         </div>
       </div>
     </div>
-  )
+  );
 }

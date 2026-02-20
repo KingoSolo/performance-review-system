@@ -6,6 +6,7 @@ import { ReviewCyclesModule } from './review-cycles/review-cycles.module';
 import { ReviewerAssignmentsModule } from './reviewer-assignments/reviewer-assignments.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ScoringModule } from './scoring/scoring.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { PrismaService } from './common/services/prisma.service';
 
@@ -18,6 +19,7 @@ import { PrismaService } from './common/services/prisma.service';
     ReviewerAssignmentsModule,
     ReviewsModule,
     ScoringModule,
+    AnalyticsModule,
   ],
   providers: [PrismaService],
 })

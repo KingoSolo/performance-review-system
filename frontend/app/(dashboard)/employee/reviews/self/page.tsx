@@ -157,12 +157,12 @@ export default function SelfReviewPage() {
       if (!answer) return;
 
       const isAnswered =
-        (q.type === 'RATING' && answer.rating !== null && answer.rating > 0) ||
+        (q.type === 'RATING' && typeof answer.rating === 'number' && answer.rating > 0) ||
         (q.type === 'TEXT' &&
-          answer.textAnswer !== null &&
+          typeof answer.textAnswer === 'string' &&
           answer.textAnswer.trim().length > 0) ||
         (q.type === 'TASK_LIST' &&
-          answer.textAnswer !== null &&
+          typeof answer.textAnswer === 'string' &&
           JSON.parse(answer.textAnswer).tasks.length > 0);
 
       if (isAnswered) answered++;

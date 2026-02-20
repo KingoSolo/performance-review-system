@@ -1,14 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { reviewCyclesApi, CreateReviewCycleDto } from '@/lib/review-cycles';
+import { reviewCyclesApi, CreateReviewCycleDto, UpdateReviewCycleDto } from '@/lib/review-cycles';
 import ReviewCycleForm from '@/components/review-cycles/ReviewCycleForm';
 
 export default function NewReviewCyclePage() {
   const router = useRouter();
 
-  const handleSubmit = async (data: CreateReviewCycleDto) => {
-    await reviewCyclesApi.create(data);
+  const handleSubmit = async (data: CreateReviewCycleDto | UpdateReviewCycleDto) => {
+    await reviewCyclesApi.create(data as CreateReviewCycleDto);
     router.push('/admin/review-cycles');
   };
 

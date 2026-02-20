@@ -1,94 +1,122 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { getCurrentUser, User } from '@/lib/auth'
-import { usersApi } from '@/lib/api'
-import { reviewCyclesApi } from '@/lib/review-cycles'
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentUser, User } from '@/lib/auth';
+import { reviewCyclesApi, ReviewCycle } from '@/lib/review-cycles';
+import { getAdminAnalytics, AdminAnalytics } from '@/lib/analytics';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 export default function AdminDashboard() {
-  const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ totalEmployees: 0, activeCycles: 0 })
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [cycles, setCycles] = useState<ReviewCycle[]>([]);
+  const [selectedCycleId, setSelectedCycleId] = useState<string>('');
+  const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const currentUser = await getCurrentUser()
+    loadData();
+  }, []);
 
-        if (!currentUser) {
-          console.log('No user found, redirecting to login')
-          router.push('/login')
-          return
-        }
-
-        // Ensure only admins can access
-        if (currentUser.role !== 'ADMIN') {
-          console.log('User is not admin, redirecting')
-          router.push('/employee')
-          return
-        }
-
-        console.log('✅ Admin user authenticated:', currentUser.email)
-        setUser(currentUser)
-
-        // Fetch dashboard stats
-        console.log('📊 Fetching dashboard stats...')
-        const [userStats, allCycles] = await Promise.all([
-          usersApi.getStats(),
-          reviewCyclesApi.getAll(),
-        ])
-
-        const activeCycles = allCycles.filter(c => c.status === 'ACTIVE')
-
-        setStats({
-          totalEmployees: userStats.total,
-          activeCycles: activeCycles.length,
-        })
-
-        console.log('✅ Dashboard stats loaded:', {
-          employees: userStats.total,
-          activeCycles: activeCycles.length,
-        })
-      } catch (error) {
-        console.error('❌ Dashboard load failed:', error)
-        router.push('/login')
-      } finally {
-        setLoading(false)
-      }
+  useEffect(() => {
+    if (selectedCycleId) {
+      loadAnalytics();
     }
+  }, [selectedCycleId]);
 
-    loadDashboard()
-  }, [router])
+  const loadData = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser || currentUser.role !== 'ADMIN') {
+        router.push('/login');
+        return;
+      }
+
+      setUser(currentUser);
+
+      const allCycles = await reviewCyclesApi.getAll();
+      setCycles(allCycles);
+
+      // Select first active cycle or first cycle
+      const activeCycle = allCycles.find((c) => c.status === 'ACTIVE');
+      if (activeCycle) {
+        setSelectedCycleId(activeCycle.id);
+      } else if (allCycles.length > 0) {
+        setSelectedCycleId(allCycles[0].id);
+      }
+    } catch (err: any) {
+      console.error('Error loading dashboard:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAnalytics = async () => {
+    if (!selectedCycleId) return;
+
+    try {
+      const data = await getAdminAnalytics(selectedCycleId);
+      setAnalytics(data);
+    } catch (err: any) {
+      console.error('Error loading analytics:', err);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!user) {
-    return null
-  }
+  if (!user) return null;
+
+  const chartData = analytics
+    ? [
+        { name: 'Submitted', value: analytics.reviewProgress.submitted, color: '#10b981' },
+        { name: 'Draft', value: analytics.reviewProgress.draft, color: '#f59e0b' },
+        { name: 'Not Started', value: analytics.reviewProgress.notStarted, color: '#6b7280' },
+      ]
+    : [];
 
   return (
     <div className="px-4 py-6 sm:px-0">
-      <div className="border-4 border-dashed border-gray-200 rounded-lg p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Admin Dashboard
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Welcome back, {user.name}! You have full access to manage your company.
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Welcome back, {user.name}! Manage your organization's performance reviews.
         </p>
+      </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Quick Stats */}
+      {/* Cycle Selector */}
+      {cycles.length > 0 && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Review Cycle
+          </label>
+          <select
+            value={selectedCycleId}
+            onChange={(e) => setSelectedCycleId(e.target.value)}
+            className="block w-full md:w-96 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            {cycles.map((cycle) => (
+              <option key={cycle.id} value={cycle.id}>
+                {cycle.name} ({cycle.status})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Key Metrics */}
+      {analytics && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-6">
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
@@ -103,7 +131,7 @@ export default function AdminDashboard() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                     />
                   </svg>
                 </div>
@@ -113,7 +141,7 @@ export default function AdminDashboard() {
                       Total Employees
                     </dt>
                     <dd className="text-lg font-semibold text-gray-900">
-                      {stats.totalEmployees}
+                      {analytics.totalEmployees}
                     </dd>
                   </dl>
                 </div>
@@ -135,17 +163,17 @@ export default function AdminDashboard() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
                     />
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">
-                      Active Review Cycles
+                      Average Score
                     </dt>
                     <dd className="text-lg font-semibold text-gray-900">
-                      {stats.activeCycles}
+                      {analytics.averageScore?.toFixed(2) || 'N/A'}
                     </dd>
                   </dl>
                 </div>
@@ -167,7 +195,7 @@ export default function AdminDashboard() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0h2a2 2 0 002-2v-6a2 2 0 012-2h2a2 2 0 012 2v6a2 2 0 01-2 2h-2"
                     />
                   </svg>
                 </div>
@@ -176,39 +204,154 @@ export default function AdminDashboard() {
                     <dt className="text-sm font-medium text-gray-500 truncate">
                       Completion Rate
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">0%</dd>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {analytics.completionRate}%
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-6 w-6 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Pending Reviews
+                    </dt>
+                    <dd className="text-lg font-semibold text-gray-900">
+                      {analytics.pendingReviews.selfReviews +
+                        analytics.pendingReviews.managerReviews +
+                        analytics.pendingReviews.peerReviews}
+                    </dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Admin Actions */}
-        <div className="mt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              onClick={() => router.push('/admin/review-cycles')}
-              className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              Manage Review Cycles
-            </button>
-            <button
-              onClick={() => router.push('/admin/employees')}
-              className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Manage Employees
-            </button>
-            <button
-              onClick={() => router.push('/admin/questions')}
-              className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Configure Questions
-            </button>
+      {/* Charts and Top Performers */}
+      {analytics && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Progress Chart */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Review Progress
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry) => `${entry.name}: ${entry.value}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
+
+          {/* Top Performers */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Top Performers
+            </h3>
+            <div className="space-y-3">
+              {analytics.topPerformers.length > 0 ? (
+                analytics.topPerformers.map((emp, idx) => (
+                  <div
+                    key={emp.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                  >
+                    <div className="flex items-center">
+                      <span className="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-sm font-semibold text-indigo-600">
+                        {idx + 1}
+                      </span>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">
+                          {emp.name}
+                        </p>
+                        <p className="text-xs text-gray-500">{emp.email}</p>
+                      </div>
+                    </div>
+                    <span className="text-lg font-bold text-indigo-600">
+                      {emp.score?.toFixed(2)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No scores available yet
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          Quick Actions
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button
+            onClick={() => router.push('/admin/review-cycles/new')}
+            className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            🔄 Start New Cycle
+          </button>
+          <button
+            onClick={() => router.push('/admin/employees')}
+            className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            👥 Manage Employees
+          </button>
+          <button
+            onClick={() => router.push('/admin/questions')}
+            className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            ❓ Edit Questions
+          </button>
+          <button
+            onClick={() =>
+              selectedCycleId &&
+              router.push(`/admin/cycles/${selectedCycleId}/scores`)
+            }
+            className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            📊 View Reports
+          </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
