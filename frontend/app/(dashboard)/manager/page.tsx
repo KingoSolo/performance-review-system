@@ -1,17 +1,56 @@
-import { getCurrentUser } from '@/lib/auth'
-import { redirect } from 'next/navigation'
+'use client';
 
-export default async function ManagerDashboard() {
-  const user = await getCurrentUser()
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentUser, User } from '@/lib/auth';
+import { reviewCyclesApi, ReviewCycle } from '@/lib/review-cycles';
 
-  if (!user) {
-    redirect('/login')
+export default function ManagerDashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [activeCycles, setActiveCycles] = useState<ReviewCycle[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      setUser(currentUser);
+
+      // Fetch active review cycles
+      try {
+        const cycles = await reviewCyclesApi.getAll('ACTIVE');
+        setActiveCycles(cycles);
+      } catch (apiError: any) {
+        console.error('API error (non-fatal):', apiError.message);
+      }
+    } catch (err: any) {
+      console.error('Error loading dashboard:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Ensure only managers or admins can access
-  if (user.role !== 'MANAGER' && user.role !== 'ADMIN') {
-    redirect('/employee')
-  }
+  if (!user) return null;
 
   return (
     <div className="px-4 py-6 sm:px-0">
@@ -116,23 +155,59 @@ export default async function ManagerDashboard() {
           </div>
         </div>
 
-        {/* Manager Actions */}
+        {/* Active Review Cycles */}
         <div className="mt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-              Review Team Members
-            </button>
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              View Team Performance
-            </button>
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              My Self Review
-            </button>
-            <button className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              Team Analytics
-            </button>
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Active Review Cycles
+          </h3>
+          {activeCycles.length === 0 ? (
+            <div className="bg-white shadow sm:rounded-lg p-6 text-center">
+              <p className="text-gray-500">
+                No active review cycles at the moment.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {activeCycles.map((cycle) => (
+                <div
+                  key={cycle.id}
+                  className="bg-white shadow sm:rounded-lg p-6"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900">
+                        {cycle.name}
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {new Date(cycle.startDate).toLocaleDateString()} -{' '}
+                        {new Date(cycle.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() =>
+                          router.push(`/manager/reviews?cycleId=${cycle.id}`)
+                        }
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Review Team Members
+                      </button>
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/employee/reviews/self?cycleId=${cycle.id}`,
+                          )
+                        }
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        My Self Review
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Team List Placeholder */}

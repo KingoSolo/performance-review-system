@@ -75,3 +75,70 @@ export async function submitReview(
     body: JSON.stringify({ answers }),
   });
 }
+
+// ============================================================================
+// Manager Review API Functions
+// ============================================================================
+
+export interface EmployeeToReview {
+  id: string;
+  name: string;
+  email: string;
+  reviewStatus: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
+}
+
+export interface ManagerReviewData {
+  review: {
+    id: string;
+    reviewCycleId: string;
+    employeeId: string;
+    reviewerId: string;
+    reviewType: string;
+    status: 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED';
+    updatedAt: string;
+  };
+  questions: QuestionWithAnswer[];
+  employeeSelfReview: {
+    status: string;
+    questions: QuestionWithAnswer[];
+  } | null;
+  employee: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+/**
+ * Get list of employees assigned to current manager for review
+ */
+export async function getEmployeesToReview(
+  cycleId: string,
+): Promise<EmployeeToReview[]> {
+  return fetchWithAuth(`${API_URL}/reviews/manager/${cycleId}`);
+}
+
+/**
+ * Get manager review form for specific employee with their self-review
+ */
+export async function getManagerReview(
+  cycleId: string,
+  employeeId: string,
+): Promise<ManagerReviewData> {
+  return fetchWithAuth(`${API_URL}/reviews/manager/${cycleId}/${employeeId}`);
+}
+
+/**
+ * Save or submit manager review
+ */
+export async function saveManagerReview(
+  cycleId: string,
+  employeeId: string,
+  answers: Answer[],
+  submit: boolean = false,
+): Promise<{ message: string; updatedAt?: string }> {
+  return fetchWithAuth(`${API_URL}/reviews/manager/${cycleId}/${employeeId}`, {
+    method: 'POST',
+    body: JSON.stringify({ answers, submit }),
+  });
+}

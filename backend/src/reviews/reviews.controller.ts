@@ -93,4 +93,76 @@ export class ReviewsController {
       dto,
     );
   }
+
+  // ============================================================================
+  // Manager Review Endpoints
+  // ============================================================================
+
+  /**
+   * GET /reviews/manager/:cycleId
+   * Get list of employees assigned to this manager for review
+   * Returns employees with their review status
+   */
+  @Get('manager/:cycleId')
+  async getEmployeesToReview(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: any,
+    @CompanyId() companyId: string,
+  ) {
+    return this.reviewsService.getEmployeesToReview(
+      user.id,
+      companyId,
+      cycleId,
+    );
+  }
+
+  /**
+   * GET /reviews/manager/:cycleId/:employeeId
+   * Get manager review form for specific employee
+   * Includes employee's self-review answers
+   */
+  @Get('manager/:cycleId/:employeeId')
+  async getManagerReview(
+    @Param('cycleId') cycleId: string,
+    @Param('employeeId') employeeId: string,
+    @CurrentUser() user: any,
+    @CompanyId() companyId: string,
+  ) {
+    return this.reviewsService.findOrCreateManagerReview(
+      user.id,
+      companyId,
+      cycleId,
+      employeeId,
+    );
+  }
+
+  /**
+   * POST /reviews/manager/:cycleId/:employeeId
+   * Save or submit manager review
+   * Body should include { answers: [...], submit: boolean }
+   */
+  @Post('manager/:cycleId/:employeeId')
+  async saveManagerReview(
+    @Param('cycleId') cycleId: string,
+    @Param('employeeId') employeeId: string,
+    @Body() body: SaveDraftDto & { submit?: boolean },
+    @CurrentUser() user: any,
+    @CompanyId() companyId: string,
+  ) {
+    // First get the review to obtain reviewId
+    const { review } = await this.reviewsService.findOrCreateManagerReview(
+      user.id,
+      companyId,
+      cycleId,
+      employeeId,
+    );
+
+    return this.reviewsService.saveManagerReview(
+      review.id,
+      user.id,
+      companyId,
+      { answers: body.answers },
+      body.submit || false,
+    );
+  }
 }
