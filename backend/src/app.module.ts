@@ -12,6 +12,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { PrismaService } from './common/services/prisma.service';
 
 @Module({
@@ -45,6 +46,9 @@ import { PrismaService } from './common/services/prisma.service';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // Apply request logger to all routes
+    consumer.apply(LoggerMiddleware).forRoutes('*');
+
     // Apply tenant context middleware to all routes except auth and health
     consumer
       .apply(TenantContextMiddleware)
