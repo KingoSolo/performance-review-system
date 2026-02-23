@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, UseGuards, Query } from '@nestjs/common';
 import { NotificationsService, NotificationPreferences } from './notifications.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -28,5 +28,20 @@ export class NotificationsController {
   ) {
     await this.notificationsService.updateUserPreferences(user.id, preferences);
     return { message: 'Notification preferences updated successfully' };
+  }
+
+  /**
+   * POST /notifications/test
+   * Send a test email to verify configuration (Admin only)
+   */
+  @Post('test')
+  async sendTestEmail(@Query('email') email: string, @CurrentUser() user: any) {
+    // Only admins can test email configuration
+    if (user.role !== 'ADMIN') {
+      return { success: false, message: 'Only admins can test email configuration' };
+    }
+
+    const testEmail = email || user.email;
+    return this.notificationsService.sendTestEmail(testEmail);
   }
 }

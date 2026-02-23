@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Resend } from 'resend';
 import { PrismaService } from '../common/services/prisma.service';
+import { LoggerService } from '../common/services/logger.service';
 
 // ============================================================================
 // DTOs
@@ -10,6 +11,7 @@ export interface EmailNotification {
   to: string;
   subject: string;
   html: string;
+  text?: string; // Plain-text fallback
 }
 
 export interface NotificationPreferences {
@@ -25,19 +27,22 @@ export interface NotificationPreferences {
 
 @Injectable()
 export class NotificationsService {
-  private readonly logger = new Logger(NotificationsService.name);
+  private readonly logger: LoggerService;
   private resend: Resend | null = null;
   private readonly fromEmail: string;
 
   constructor(private prisma: PrismaService) {
+    this.logger = new LoggerService();
+    this.logger.setContext('NotificationsService');
+
     const apiKey = process.env.EMAIL_SERVICE_KEY;
-    this.fromEmail = process.env.EMAIL_FROM || 'noreply@performanceapp.com';
+    this.fromEmail = process.env.EMAIL_FROM || 'noreply@reviewly.com';
 
     if (apiKey) {
       this.resend = new Resend(apiKey);
-      this.logger.log('✅ Email service initialized');
+      this.logger.log('Email service initialized with Resend');
     } else {
-      this.logger.warn('⚠️  EMAIL_SERVICE_KEY not set - emails will be logged only');
+      this.logger.warn('EMAIL_SERVICE_KEY not set - emails will be logged only');
     }
   }
 
@@ -48,9 +53,11 @@ export class NotificationsService {
   private async sendEmail(notification: EmailNotification): Promise<void> {
     try {
       if (!this.resend) {
-        this.logger.log(`📧 [DEV MODE] Email to ${notification.to}:`);
-        this.logger.log(`   Subject: ${notification.subject}`);
-        this.logger.log(`   Body: ${notification.html.substring(0, 200)}...`);
+        this.logger.log(`[DEV MODE] Email to ${notification.to}`);
+        this.logger.log(`Subject: ${notification.subject}`);
+        if (notification.text) {
+          this.logger.log(`Plain text: ${notification.text.substring(0, 150)}...`);
+        }
         return;
       }
 
@@ -59,11 +66,13 @@ export class NotificationsService {
         to: notification.to,
         subject: notification.subject,
         html: notification.html,
+        text: notification.text,
       });
 
-      this.logger.log(`✅ Email sent to ${notification.to}: ${notification.subject}`);
+      this.logger.log(`Email sent to ${notification.to}: ${notification.subject}`);
     } catch (error: any) {
-      this.logger.error(`❌ Failed to send email to ${notification.to}:`, error.message);
+      this.logger.error(`Failed to send email to ${notification.to}: ${error.message}`);
+      throw error;
     }
   }
 
@@ -436,5 +445,178 @@ export class NotificationsService {
     });
 
     this.logger.log(`Updated notification preferences for user ${userId}`);
+  }
+
+  // ============================================================================
+  // Welcome Email
+  // ============================================================================
+
+  private welcomeEmailTemplate(userName: string, companyName: string): { html: string; text: string } {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #4f46e5; color: white; padding: 30px 20px; text-align: center; }
+          .content { padding: 30px 20px; background-color: #f9fafb; }
+          .button { display: inline-block; padding: 14px 28px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; font-weight: 600; }
+          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+          .highlight { background-color: #e0e7ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Welcome to Reviewly!</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${userName},</p>
+            <p>Welcome to <strong>${companyName}</strong>'s performance review system!</p>
+            <div class="highlight">
+              <p><strong>Your account is now active.</strong> You can start participating in performance reviews and tracking your progress.</p>
+            </div>
+            <p><strong>What you can do:</strong></p>
+            <ul>
+              <li>Complete self-reviews when cycles start</li>
+              <li>Provide peer feedback when assigned</li>
+              <li>View your performance scores and feedback</li>
+              <li>Track your progress over time</li>
+            </ul>
+            <p>Get started by logging in to your dashboard:</p>
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" class="button">Go to Dashboard</a>
+          </div>
+          <div class="footer">
+            <p>Questions? Contact your HR administrator.</p>
+            <p>This is an automated message from Reviewly.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+Welcome to Reviewly!
+
+Hi ${userName},
+
+Welcome to ${companyName}'s performance review system!
+
+Your account is now active. You can start participating in performance reviews and tracking your progress.
+
+What you can do:
+- Complete self-reviews when cycles start
+- Provide peer feedback when assigned
+- View your performance scores and feedback
+- Track your progress over time
+
+Get started by logging in to your dashboard:
+${process.env.FRONTEND_URL || 'http://localhost:3000'}/login
+
+Questions? Contact your HR administrator.
+This is an automated message from Reviewly.
+    `;
+
+    return { html, text: text.trim() };
+  }
+
+  async sendWelcomeEmail(userId: string): Promise<void> {
+    this.logger.log(`Sending welcome email to user ${userId}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { company: true },
+    });
+
+    if (!user) {
+      this.logger.error('User not found');
+      return;
+    }
+
+    const template = this.welcomeEmailTemplate(user.name, user.company.name);
+
+    await this.sendEmail({
+      to: user.email,
+      subject: `Welcome to ${user.company.name}'s Reviewly!`,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  // ============================================================================
+  // Test Email
+  // ============================================================================
+
+  async sendTestEmail(toEmail: string): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!this.resend) {
+        return {
+          success: false,
+          message: 'Email service not configured. Set EMAIL_SERVICE_KEY environment variable.',
+        };
+      }
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #10b981; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background-color: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>✅ Email Service Test Successful!</h1>
+            </div>
+            <div class="content">
+              <p>This is a test email from Reviewly.</p>
+              <p>If you're seeing this, your email configuration is working correctly!</p>
+              <p><strong>Configuration:</strong></p>
+              <ul>
+                <li>From: ${this.fromEmail}</li>
+                <li>Service: Resend</li>
+                <li>Environment: ${process.env.NODE_ENV || 'development'}</li>
+              </ul>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const text = `
+Email Service Test Successful!
+
+This is a test email from Reviewly.
+If you're seeing this, your email configuration is working correctly!
+
+Configuration:
+- From: ${this.fromEmail}
+- Service: Resend
+- Environment: ${process.env.NODE_ENV || 'development'}
+      `;
+
+      await this.sendEmail({
+        to: toEmail,
+        subject: 'Reviewly - Email Service Test',
+        html,
+        text: text.trim(),
+      });
+
+      return {
+        success: true,
+        message: `Test email sent successfully to ${toEmail}`,
+      };
+    } catch (error: any) {
+      this.logger.error(`Test email failed: ${error.message}`);
+      return {
+        success: false,
+        message: `Failed to send test email: ${error.message}`,
+      };
+    }
   }
 }

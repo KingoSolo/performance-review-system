@@ -1,12 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationsService } from './notifications.service';
+import { LoggerService } from '../common/services/logger.service';
 
 @Injectable()
 export class NotificationsCronService {
-  private readonly logger = new Logger(NotificationsCronService.name);
+  private readonly logger: LoggerService;
 
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(private readonly notificationsService: NotificationsService) {
+    this.logger = new LoggerService();
+    this.logger.setContext('NotificationsCron');
+  }
 
   /**
    * Daily cron job to send reminders for pending reviews
