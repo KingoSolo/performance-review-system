@@ -28,6 +28,8 @@ export default function EmployeesPage() {
         const currentUser = await getCurrentUser();
         if (!currentUser) {
           console.log('⚠️  No user, redirecting to login');
+          const { signOut } = await import('@/lib/auth');
+          await signOut();
           router.push('/login');
           return;
         }
@@ -58,6 +60,8 @@ export default function EmployeesPage() {
       } catch (err: any) {
         console.error('❌ Error loading employees page:', err);
         setError(err.message || 'Failed to load data');
+        // On error, don't redirect - just show error
+        // The fetchWithAuth will handle 401 automatically
       } finally {
         setLoading(false);
       }

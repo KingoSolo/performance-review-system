@@ -28,8 +28,17 @@ export default function AdminDashboard() {
   const loadData = async () => {
     try {
       const currentUser = await getCurrentUser();
-      if (!currentUser || currentUser.role !== 'ADMIN') {
+      if (!currentUser) {
+        console.log('⚠️  No user found, redirecting to login');
+        const { signOut } = await import('@/lib/auth');
+        await signOut();
         router.push('/login');
+        return;
+      }
+
+      if (currentUser.role !== 'ADMIN') {
+        console.log('⚠️  Not admin, redirecting');
+        router.push('/employee');
         return;
       }
 
@@ -47,6 +56,10 @@ export default function AdminDashboard() {
       }
     } catch (err: any) {
       console.error('Error loading dashboard:', err);
+      // On error, sign out and redirect
+      const { signOut } = await import('@/lib/auth');
+      await signOut();
+      router.push('/login');
     } finally {
       setLoading(false);
     }

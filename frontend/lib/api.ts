@@ -59,6 +59,17 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     },
   })
 
+  // Handle 401 by signing out
+  if (response.status === 401) {
+    console.error('❌ 401 Unauthorized - signing out')
+    const { signOut } = await import('./auth')
+    await signOut()
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+    throw new Error('Session expired')
+  }
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }))
     throw new Error(error.message || `HTTP ${response.status}`)
