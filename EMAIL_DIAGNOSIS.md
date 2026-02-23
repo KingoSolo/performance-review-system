@@ -18,7 +18,7 @@
 ### Why You Might Not See Them:
 
 #### 1. Check Correct Resend Account
-- Your Resend API key: `re_JqZAc55P_...`
+- Check your Resend API key in `.env` file
 - Login to: https://resend.com/emails
 - Make sure you're using the correct account
 

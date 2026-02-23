@@ -158,8 +158,11 @@ grep "Email service initialized" /tmp/backend-notifications.log
 
 **Check 3: Test Resend Connection**
 ```bash
+# Get your API key from .env file
+API_KEY=$(grep EMAIL_SERVICE_KEY .env | cut -d '=' -f2 | tr -d '"')
+
 curl -X POST https://api.resend.com/emails \
-  -H "Authorization: Bearer re_JqZAc55P_7pWMtqHy4dc79hLqcWMJXSCi" \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "from": "noreply@performanceapp.com",
