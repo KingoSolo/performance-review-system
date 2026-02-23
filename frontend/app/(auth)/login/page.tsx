@@ -3,6 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn, signUp } from '@/lib/auth'
+import {
+  validateEmail,
+  validatePassword,
+  validatePasswordStrength,
+  validatePasswordConfirm,
+  validateName,
+  getInputClassName,
+  getPasswordStrengthColor,
+  getPasswordStrengthLabel,
+} from '@/lib/validation'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,15 +24,110 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     name: '',
     companyName: '',
   })
 
+  const [fieldErrors, setFieldErrors] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    name: '',
+    companyName: '',
+  })
+
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+    confirmPassword: false,
+    name: false,
+    companyName: false,
+  })
+
+  // Validate individual field
+  const validateField = (field: string, value: string): string => {
+    switch (field) {
+      case 'email':
+        return validateEmail(value) || ''
+      case 'password':
+        if (isSignUp) {
+          const strength = validatePasswordStrength(value)
+          return strength.isValid ? '' : strength.feedback.join(', ')
+        }
+        return validatePassword(value) || ''
+      case 'confirmPassword':
+        if (isSignUp) {
+          return validatePasswordConfirm(formData.password, value) || ''
+        }
+        return ''
+      case 'name':
+        if (isSignUp) {
+          return validateName(value, 'Full Name') || ''
+        }
+        return ''
+      case 'companyName':
+        if (isSignUp) {
+          return validateName(value, 'Company Name') || ''
+        }
+        return ''
+      default:
+        return ''
+    }
+  }
+
+  // Handle field blur (show validation)
+  const handleBlur = (field: string) => {
+    setTouched({ ...touched, [field]: true })
+    const error = validateField(field, formData[field as keyof typeof formData])
+    setFieldErrors({ ...fieldErrors, [field]: error })
+  }
+
+  // Handle field change
+  const handleChange = (field: string, value: string) => {
+    setFormData({ ...formData, [field]: value })
+
+    // Real-time validation if field was touched
+    if (touched[field as keyof typeof touched]) {
+      const error = validateField(field, value)
+      setFieldErrors({ ...fieldErrors, [field]: error })
+    }
+  }
+
+  // Validate all fields before submit
+  const validateForm = (): boolean => {
+    const errors = {
+      email: validateField('email', formData.email),
+      password: validateField('password', formData.password),
+      confirmPassword: isSignUp ? validateField('confirmPassword', formData.confirmPassword) : '',
+      name: isSignUp ? validateField('name', formData.name) : '',
+      companyName: isSignUp ? validateField('companyName', formData.companyName) : '',
+    }
+
+    setFieldErrors(errors)
+    setTouched({
+      email: true,
+      password: true,
+      confirmPassword: isSignUp,
+      name: isSignUp,
+      companyName: isSignUp,
+    })
+
+    return !Object.values(errors).some((err) => err !== '')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
     setSuccess('')
+
+    // Validate form
+    if (!validateForm()) {
+      setError('Please fix the errors above')
+      return
+    }
+
+    setLoading(true)
 
     try {
       if (isSignUp) {
@@ -85,77 +190,151 @@ export default function LoginPage() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+          <div className="space-y-4">
             {isSignUp && (
               <>
                 <div>
-                  <label htmlFor="name" className="sr-only">
-                    Full Name
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="name"
                     name="name"
                     type="text"
-                    required={isSignUp}
-                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                    placeholder="Full Name"
+                    className={getInputClassName(
+                      touched.name && !!fieldErrors.name,
+                      touched.name && !fieldErrors.name && formData.name.length > 0
+                    )}
+                    placeholder="Enter your full name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    onBlur={() => handleBlur('name')}
                   />
+                  {touched.name && fieldErrors.name && (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
+                  )}
                 </div>
                 <div>
-                  <label htmlFor="company" className="sr-only">
-                    Company Name
+                  <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">
+                    Company Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="company"
                     name="company"
                     type="text"
-                    required={isSignUp}
-                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                    placeholder="Company Name"
+                    className={getInputClassName(
+                      touched.companyName && !!fieldErrors.companyName,
+                      touched.companyName && !fieldErrors.companyName && formData.companyName.length > 0
+                    )}
+                    placeholder="Enter your company name"
                     value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    onChange={(e) => handleChange('companyName', e.target.value)}
+                    onBlur={() => handleBlur('companyName')}
                   />
+                  {touched.companyName && fieldErrors.companyName && (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.companyName}</p>
+                  )}
                 </div>
               </>
             )}
 
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address <span className="text-red-500">*</span>
               </label>
               <input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 ${
-                  !isSignUp ? 'rounded-t-md' : ''
-                } focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
-                placeholder="Email address"
+                className={getInputClassName(
+                  touched.email && !!fieldErrors.email,
+                  touched.email && !fieldErrors.email && formData.email.length > 0
+                )}
+                placeholder="you@company.com"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => handleChange('email', e.target.value)}
+                onBlur={() => handleBlur('email')}
               />
+              {touched.email && fieldErrors.email && (
+                <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+              )}
             </div>
 
             <div>
-              <label htmlFor="password" className="sr-only">
-                Password
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Password <span className="text-red-500">*</span>
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                className={getInputClassName(
+                  touched.password && !!fieldErrors.password,
+                  touched.password && !fieldErrors.password && formData.password.length >= 8
+                )}
+                placeholder={isSignUp ? 'Minimum 8 characters' : 'Enter your password'}
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => handleChange('password', e.target.value)}
+                onBlur={() => handleBlur('password')}
               />
+              {touched.password && fieldErrors.password && (
+                <p className="mt-1 text-sm text-red-600">{fieldErrors.password}</p>
+              )}
+
+              {/* Password strength indicator for signup */}
+              {isSignUp && formData.password.length > 0 && (
+                <div className="mt-2">
+                  {(() => {
+                    const strength = validatePasswordStrength(formData.password)
+                    return (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${getPasswordStrengthColor(strength.score)}`}
+                              style={{ width: `${(strength.score / 4) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-gray-600">
+                            {getPasswordStrengthLabel(strength.score)}
+                          </span>
+                        </div>
+                        {strength.feedback.length > 0 && (
+                          <p className="mt-1 text-xs text-gray-500">{strength.feedback.join(', ')}</p>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
             </div>
+
+            {isSignUp && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  className={getInputClassName(
+                    touched.confirmPassword && !!fieldErrors.confirmPassword,
+                    touched.confirmPassword && !fieldErrors.confirmPassword && formData.confirmPassword.length > 0
+                  )}
+                  placeholder="Re-enter your password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                  onBlur={() => handleBlur('confirmPassword')}
+                />
+                {touched.confirmPassword && fieldErrors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.confirmPassword}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -205,6 +384,20 @@ export default function LoginPage() {
                 setIsSignUp(!isSignUp)
                 setError('')
                 setSuccess('')
+                setFieldErrors({
+                  email: '',
+                  password: '',
+                  confirmPassword: '',
+                  name: '',
+                  companyName: '',
+                })
+                setTouched({
+                  email: false,
+                  password: false,
+                  confirmPassword: false,
+                  name: false,
+                  companyName: false,
+                })
               }}
               className="text-sm text-indigo-600 hover:text-indigo-500"
             >

@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react'
 import { usersApi } from '@/lib/api'
 import type { User } from '@/lib/api'
+import {
+  validateEmail,
+  validateName,
+  getInputClassName,
+} from '@/lib/validation'
 
 interface CreateEmployeeModalProps {
   onClose: () => void
@@ -20,15 +25,78 @@ export default function CreateEmployeeModal({ onClose, onSuccess }: CreateEmploy
     managerId: '',
   })
 
+  const [fieldErrors, setFieldErrors] = useState({
+    name: '',
+    email: '',
+  })
+
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+  })
+
   useEffect(() => {
     // Fetch managers for dropdown
     usersApi.getManagers().then(setManagers).catch(console.error)
   }, [])
 
+  // Validate individual field
+  const validateField = (field: string, value: string): string => {
+    switch (field) {
+      case 'name':
+        return validateName(value, 'Full Name') || ''
+      case 'email':
+        return validateEmail(value) || ''
+      default:
+        return ''
+    }
+  }
+
+  // Handle field blur (show validation)
+  const handleBlur = (field: string) => {
+    setTouched({ ...touched, [field]: true })
+    const error = validateField(field, formData[field as keyof typeof formData])
+    setFieldErrors({ ...fieldErrors, [field]: error })
+  }
+
+  // Handle field change
+  const handleChange = (field: string, value: string) => {
+    setFormData({ ...formData, [field]: value })
+
+    // Real-time validation if field was touched
+    if (touched[field as keyof typeof touched]) {
+      const error = validateField(field, value)
+      setFieldErrors({ ...fieldErrors, [field]: error })
+    }
+  }
+
+  // Validate all fields before submit
+  const validateForm = (): boolean => {
+    const errors = {
+      name: validateField('name', formData.name),
+      email: validateField('email', formData.email),
+    }
+
+    setFieldErrors(errors)
+    setTouched({
+      name: true,
+      email: true,
+    })
+
+    return !Object.values(errors).some((err) => err !== '')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
+
+    // Validate form
+    if (!validateForm()) {
+      setError('Please fix the errors above')
+      return
+    }
+
+    setLoading(true)
 
     try {
       await usersApi.create({
@@ -64,30 +132,44 @@ export default function CreateEmployeeModal({ onClose, onSuccess }: CreateEmploy
               <div className="space-y-4">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                    Full Name *
+                    Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     id="name"
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`mt-1 ${getInputClassName(
+                      touched.name && !!fieldErrors.name,
+                      touched.name && !fieldErrors.name && formData.name.length > 0
+                    )}`}
+                    placeholder="Enter employee's full name"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    onBlur={() => handleBlur('name')}
                   />
+                  {touched.name && fieldErrors.name && (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    Email Address *
+                    Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
                     id="email"
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`mt-1 ${getInputClassName(
+                      touched.email && !!fieldErrors.email,
+                      touched.email && !fieldErrors.email && formData.email.length > 0
+                    )}`}
+                    placeholder="employee@company.com"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => handleChange('email', e.target.value)}
+                    onBlur={() => handleBlur('email')}
                   />
+                  {touched.email && fieldErrors.email && (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
