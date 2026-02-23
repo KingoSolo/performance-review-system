@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   reviewCyclesApi,
@@ -10,6 +11,7 @@ import {
 import ReviewCycleList from '@/components/review-cycles/ReviewCycleList';
 
 export default function ReviewCyclesPage() {
+  const router = useRouter();
   const [allCycles, setAllCycles] = useState<ReviewCycle[]>([]);
   const [cycles, setCycles] = useState<ReviewCycle[]>([]);
   const [selectedTab, setSelectedTab] = useState<ReviewCycleStatus>('DRAFT');
@@ -49,19 +51,40 @@ export default function ReviewCyclesPage() {
   return (
     <div className="px-4 py-6 sm:px-0">
       {/* Header */}
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Review Cycles</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Configure and manage performance review cycles
-          </p>
-        </div>
-        <Link
-          href="/admin/review-cycles/new"
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+      <div className="mb-6">
+        <button
+          onClick={() => router.push('/admin')}
+          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
         >
-          + New Review Cycle
-        </Link>
+          <svg
+            className="h-4 w-4 mr-1"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          Back to Dashboard
+        </button>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Review Cycles</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Configure and manage performance review cycles
+            </p>
+          </div>
+          <Link
+            href="/admin/review-cycles/new"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            + New Review Cycle
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}

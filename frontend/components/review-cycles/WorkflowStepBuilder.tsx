@@ -48,6 +48,9 @@ export default function WorkflowStepBuilder({
     { value: 'PEER', label: 'Peer Review', color: 'purple' },
   ];
 
+  const hasSelfReview = steps.some((step) => step.reviewType === 'SELF');
+  const maxStepsReached = steps.length >= 3;
+
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <div className="flex justify-between items-center mb-4">
@@ -56,18 +59,33 @@ export default function WorkflowStepBuilder({
             Workflow Steps
           </h2>
           <p className="text-sm text-gray-600">
-            Define the review process and timeline
+            Define the review process and timeline (max 3 steps)
           </p>
         </div>
         <button
           type="button"
           onClick={addStep}
-          disabled={!cycleStart || !cycleEnd}
+          disabled={!cycleStart || !cycleEnd || maxStepsReached}
           className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+          title={
+            maxStepsReached
+              ? 'Maximum 3 steps allowed'
+              : !cycleStart || !cycleEnd
+                ? 'Set cycle dates first'
+                : 'Add a new workflow step'
+          }
         >
           + Add Step
         </button>
       </div>
+
+      {maxStepsReached && (
+        <div className="mb-4 rounded-md bg-yellow-50 p-3">
+          <p className="text-sm text-yellow-800">
+            Maximum of 3 workflow steps reached
+          </p>
+        </div>
+      )}
 
       {!cycleStart || !cycleEnd ? (
         <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
@@ -107,8 +125,20 @@ export default function WorkflowStepBuilder({
                       className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     >
                       {reviewTypes.map((type) => (
-                        <option key={type.value} value={type.value}>
+                        <option
+                          key={type.value}
+                          value={type.value}
+                          disabled={
+                            type.value === 'SELF' &&
+                            hasSelfReview &&
+                            step.reviewType !== 'SELF'
+                          }
+                        >
                           {type.label}
+                          {type.value === 'SELF' &&
+                            hasSelfReview &&
+                            step.reviewType !== 'SELF' &&
+                            ' (already added)'}
                         </option>
                       ))}
                     </select>

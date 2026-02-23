@@ -2,9 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { ReviewCycleStatus, ReviewType } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface CreateReviewCycleDto {
   name: string;
@@ -28,7 +31,11 @@ export interface UpdateReviewCycleDto {
 
 @Injectable()
 export class ReviewCyclesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Get all review cycles for a company, optionally filtered by status
@@ -288,7 +295,7 @@ export class ReviewCyclesService {
       );
     }
 
-    return this.prisma.reviewCycle.update({
+    const activatedCycle = await this.prisma.reviewCycle.update({
       where: { id },
       data: { status: 'ACTIVE' },
       include: {
@@ -297,6 +304,15 @@ export class ReviewCyclesService {
         },
       },
     });
+
+    // Send cycle started notifications to all employees
+    await this.notificationsService
+      .sendCycleStartedNotifications(id, companyId)
+      .catch((err) =>
+        console.error('Failed to send cycle started notifications:', err),
+      );
+
+    return activatedCycle;
   }
 
   /**
@@ -403,6 +419,17 @@ export class ReviewCyclesService {
     cycleEnd: Date,
     configs: ReviewConfigDto[],
   ) {
+    // Validate maximum 3 steps
+    if (configs.length > 3) {
+      throw new BadRequestException('Maximum 3 workflow steps allowed');
+    }
+
+    // Validate no duplicate Self Review steps
+    const selfReviewSteps = configs.filter((c) => c.reviewType === 'SELF');
+    if (selfReviewSteps.length > 1) {
+      throw new BadRequestException('Only one Self Review step is allowed');
+    }
+
     for (const config of configs) {
       const configStart = new Date(config.startDate);
       const configEnd = new Date(config.endDate);

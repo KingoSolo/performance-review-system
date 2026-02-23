@@ -190,3 +190,44 @@ P2: Navigation routes wrong (Create Review Cycles vs Analytics)
 - Fix auth/session stability first (P0), then data fetching, then navigation.
 - Do not change backend business logic for review cycles.
 ``
+
+# EMAIL AND UI ISSUES
+We have issues in Notifications + Dashboard UI navigation.
+
+P0: Emails are not being sent at all
+- No emails in admin inbox
+- Resend dashboard shows NO emails sent
+- Preferences are toggled ON and saved successfully on /settings
+- Activating a review cycle should trigger "Cycle Started" emails
+
+Investigate first, do NOT patch blindly:
+1) When activating a cycle, confirm notification trigger runs (add/verify logs).
+2) Confirm EMAIL_SERVICE_KEY and EMAIL_FROM are loaded at runtime.
+3) Confirm recipient query returns users (same company_id, not empty, not excluding everyone).
+4) Confirm preference keys match between UI saved data and backend checks.
+5) Ensure resend send errors are logged and surfaced.
+
+Deliverable:
+- A short diagnosis report with the exact reason emails aren’t sent.
+- Then implement the smallest fix to get "Cycle Started" emails showing in Resend dashboard.
+
+P1: UI navigation gaps
+- No Settings icon/link anywhere to reach /settings
+- On /settings page there is no obvious way back to dashboard
+- On /admin/review-cycles page there is no way back to dashboard
+
+Fix:
+- Add a Settings link (gear icon) to dashboard navbar/sidebar
+- Ensure /settings and /admin/review-cycles use the same dashboard layout and navigation
+- Add breadcrumb or "Back to Dashboard" button
+
+P2: Workflow builder validation
+- Review cycle workflow allows more than 3 steps
+- Multiple steps can be "Self Review" simultaneously
+Decide rules:
+- Enforce max steps (if required)
+- Prevent duplicate "Self Review" steps (recommended)
+Implement UI validation + backend validation (if needed) but keep minimal.
+
+Do fixes in order: P0 -> P1 -> P2
+``

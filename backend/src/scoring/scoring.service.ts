@@ -2,8 +2,11 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // ============================================================================
 // DTOs
@@ -58,7 +61,11 @@ export interface AllScoresResponse {
 
 @Injectable()
 export class ScoringService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Calculate final score for a single employee
@@ -252,7 +259,7 @@ export class ScoringService {
       warnings.push('No reviews available to calculate score');
     }
 
-    return {
+    const result = {
       employeeId: employee.id,
       employeeName: employee.name,
       cycleId: cycle.id,
@@ -273,6 +280,17 @@ export class ScoringService {
       },
       warnings,
     };
+
+    // Send score available notification to employee
+    if (overallScore) {
+      await this.notificationsService
+        .sendScoreAvailableNotification(employeeId, cycleId, overallScore)
+        .catch((err) =>
+          console.error('Failed to send score notification:', err),
+        );
+    }
+
+    return result;
   }
 
   /**

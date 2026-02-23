@@ -83,6 +83,21 @@ export default function ReviewCycleForm({
       }
     }
 
+    // Validate maximum steps
+    if (formData.reviewConfigs.length > 3) {
+      setError('Maximum 3 workflow steps allowed');
+      return;
+    }
+
+    // Validate no duplicate Self Review steps
+    const selfReviewSteps = formData.reviewConfigs.filter(
+      (config) => config.reviewType === 'SELF',
+    );
+    if (selfReviewSteps.length > 1) {
+      setError('Only one Self Review step is allowed');
+      return;
+    }
+
     try {
       setLoading(true);
       if (mode === 'create') {
